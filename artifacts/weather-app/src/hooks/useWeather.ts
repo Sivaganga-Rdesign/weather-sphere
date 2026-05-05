@@ -6,6 +6,7 @@ import {
   fetchForecastByCoords,
   WeatherData,
   ForecastDay,
+  HourlyPoint,
 } from "../services/weatherService";
 
 const RECENT_KEY = "weather_recent_searches";
@@ -20,8 +21,7 @@ export function useRecentSearches() {
   };
   const add = (city: string) => {
     const prev = get().filter((c) => c.toLowerCase() !== city.toLowerCase());
-    const next = [city, ...prev].slice(0, 5);
-    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+    localStorage.setItem(RECENT_KEY, JSON.stringify([city, ...prev].slice(0, 5)));
   };
   return { get, add };
 }
@@ -29,6 +29,7 @@ export function useRecentSearches() {
 export interface WeatherState {
   weather: WeatherData | null;
   forecast: ForecastDay[];
+  hourly: HourlyPoint[];
   loading: boolean;
   error: string | null;
   searchCity: (city: string) => Promise<void>;
@@ -38,6 +39,7 @@ export interface WeatherState {
 export function useWeather(): WeatherState {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [forecast, setForecast] = useState<ForecastDay[]>([]);
+  const [hourly, setHourly] = useState<HourlyPoint[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const recent = useRecentSearches();
@@ -46,9 +48,10 @@ export function useWeather(): WeatherState {
     setLoading(true);
     setError(null);
     try {
-      const [w, f] = await Promise.all([fetchWeatherByCity(city), fetchForecast(city)]);
+      const [w, fc] = await Promise.all([fetchWeatherByCity(city), fetchForecast(city)]);
       setWeather(w);
-      setForecast(f);
+      setForecast(fc.daily);
+      setHourly(fc.hourly);
       recent.add(w.city);
     } catch (e: any) {
       const msg =
@@ -74,12 +77,13 @@ export function useWeather(): WeatherState {
       async (pos) => {
         try {
           const { latitude: lat, longitude: lon } = pos.coords;
-          const [w, f] = await Promise.all([
+          const [w, fc] = await Promise.all([
             fetchWeatherByCoords(lat, lon),
             fetchForecastByCoords(lat, lon),
           ]);
           setWeather(w);
-          setForecast(f);
+          setForecast(fc.daily);
+          setHourly(fc.hourly);
           recent.add(w.city);
         } catch {
           setError("Failed to fetch weather for your location.");
@@ -94,5 +98,5 @@ export function useWeather(): WeatherState {
     );
   }, []);
 
-  return { weather, forecast, loading, error, searchCity, detectLocation };
+  return { weather, forecast, hourly, loading, error, searchCity, detectLocation };
 }
