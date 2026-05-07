@@ -5,6 +5,7 @@ import WeatherCard from "./components/WeatherCard";
 import Forecast from "./components/Forecast";
 import HourlyChart from "./components/HourlyChart";
 import WeatherDetails from "./components/WeatherDetails";
+import WeatherAlerts from "./components/WeatherAlerts";
 import Loader from "./components/Loader";
 import EmptyState from "./components/EmptyState";
 import Background3D from "./components/Background3D";
@@ -105,6 +106,7 @@ export default function App() {
                   className="flex flex-col gap-4 mt-2"
                 >
                   <WeatherCard weather={weather} condition={condition} />
+                  <WeatherAlerts weather={weather} condition={condition} airQuality={airQuality} forecast={forecast} />
                   <WeatherDetails weather={weather} condition={condition} airQuality={airQuality} />
                   {hourly.length > 0 && forecast.length > 0 && (
                     <HourlyChart hourly={hourly} forecast={forecast} />
