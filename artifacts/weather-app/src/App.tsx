@@ -11,22 +11,33 @@ import Background3D from "./components/Background3D";
 import { useWeather } from "./hooks/useWeather";
 import { getWeatherCondition, WeatherCondition } from "./services/weatherService";
 
-const CONDITION_EMOJI: Record<WeatherCondition, string> = {
-  clear: "☀️", clouds: "☁️", rain: "🌧", snow: "❄️",
-  thunderstorm: "⚡", mist: "🌫", default: "🌤",
+const CONDITION_ICON: Record<WeatherCondition, { day: string; night: string }> = {
+  clear:        { day: "☀️",  night: "🌙" },
+  clouds:       { day: "⛅",  night: "☁️" },
+  rain:         { day: "🌧",  night: "🌧" },
+  snow:         { day: "❄️",  night: "❄️" },
+  thunderstorm: { day: "⚡",  night: "⚡" },
+  mist:         { day: "🌫",  night: "🌫" },
+  default:      { day: "🌤",  night: "🌙" },
 };
 
 export default function App() {
-  const { weather, forecast, hourly, loading, error, searchCity, detectLocation } = useWeather();
+  const { weather, forecast, hourly, airQuality, loading, error, searchCity, detectLocation } = useWeather();
   const [condition, setCondition] = useState<WeatherCondition>("default");
+  const [isDay, setIsDay] = useState(true);
 
   useEffect(() => {
-    if (weather) setCondition(getWeatherCondition(weather.condition));
+    if (weather) {
+      setCondition(getWeatherCondition(weather.condition));
+      setIsDay(weather.isDay);
+    }
   }, [weather]);
+
+  const headerIcon = CONDITION_ICON[condition]?.[isDay ? "day" : "night"] ?? "🌤";
 
   return (
     <div className="min-h-screen text-white relative">
-      <Background3D condition={condition} />
+      <Background3D condition={condition} isDay={isDay} />
 
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Header */}
@@ -46,13 +57,13 @@ export default function App() {
                 </p>
               </div>
               <motion.div
-                key={condition}
+                key={`${condition}-${isDay}`}
                 initial={{ scale: 0.5, rotate: -20 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: "spring", stiffness: 300 }}
                 className="w-9 h-9 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-base"
               >
-                {CONDITION_EMOJI[condition]}
+                {headerIcon}
               </motion.div>
             </motion.div>
 
@@ -77,15 +88,12 @@ export default function App() {
               )}
             </AnimatePresence>
 
-            {/* Loading */}
             {loading && <Loader />}
 
-            {/* Empty state */}
             {!loading && !weather && !error && (
               <EmptyState onLocate={detectLocation} />
             )}
 
-            {/* Weather data */}
             <AnimatePresence mode="wait">
               {!loading && weather && (
                 <motion.div
@@ -97,7 +105,7 @@ export default function App() {
                   className="flex flex-col gap-4 mt-2"
                 >
                   <WeatherCard weather={weather} condition={condition} />
-                  <WeatherDetails weather={weather} condition={condition} />
+                  <WeatherDetails weather={weather} condition={condition} airQuality={airQuality} />
                   {hourly.length > 0 && forecast.length > 0 && (
                     <HourlyChart hourly={hourly} forecast={forecast} />
                   )}
@@ -108,7 +116,6 @@ export default function App() {
           </div>
         </main>
 
-        {/* Footer */}
         <footer className="px-4 pb-4 text-center">
           <p className="text-white/20 text-xs">Powered by OpenWeatherMap</p>
         </footer>
