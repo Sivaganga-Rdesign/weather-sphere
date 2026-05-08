@@ -82,8 +82,37 @@ function drawCloud(ctx: CanvasRenderingContext2D, x: number, y: number, scale: n
   ctx.restore();
 }
 
-function drawSun(ctx: CanvasRenderingContext2D, sx: number, sy: number, t: number, size = 55) {
+function drawSun(ctx: CanvasRenderingContext2D, sx: number, sy: number, t: number, size = 55, winter = false) {
   const r = size * (1 + Math.sin(t * 1.1) * 0.03);
+
+  if (winter) {
+    // Cold/freezing: pale white-silver sun, very faint halo, barely-visible rays
+    const g1 = ctx.createRadialGradient(sx, sy, r * 0.3, sx, sy, r * 3.5);
+    g1.addColorStop(0, "rgba(220,235,255,0.20)"); g1.addColorStop(0.5, "rgba(200,220,255,0.07)"); g1.addColorStop(1, "rgba(200,220,255,0)");
+    ctx.fillStyle = g1; ctx.beginPath(); ctx.arc(sx, sy, r * 3.5, 0, Math.PI * 2); ctx.fill();
+
+    // Short, faint icy rays
+    for (let i = 0; i < 10; i++) {
+      const angle = (i / 10) * Math.PI * 2 + t * 0.12;
+      const len = r * (1.4 + 0.2 * Math.sin(t + i));
+      ctx.beginPath(); ctx.strokeStyle = `rgba(200,220,255,${0.12 + 0.08 * Math.sin(t + i)})`;
+      ctx.lineWidth = 1.5; ctx.lineCap = "round";
+      ctx.moveTo(sx + Math.cos(angle) * (r + 3), sy + Math.sin(angle) * (r + 3));
+      ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len); ctx.stroke();
+    }
+
+    // Pale white disc
+    const disc = ctx.createRadialGradient(sx - r * 0.1, sy - r * 0.1, 0, sx, sy, r);
+    disc.addColorStop(0, "rgba(255,255,255,0.92)"); disc.addColorStop(0.5, "rgba(220,235,255,0.80)"); disc.addColorStop(1, "rgba(190,215,245,0.65)");
+    ctx.fillStyle = disc; ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2); ctx.fill();
+
+    // Icy ring at edge
+    ctx.beginPath(); ctx.arc(sx, sy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(180,210,240,0.30)"; ctx.lineWidth = 2; ctx.stroke();
+    return;
+  }
+
+  // Warm sun (hot/mild)
   const g1 = ctx.createRadialGradient(sx, sy, r * 0.3, sx, sy, r * 5.5);
   g1.addColorStop(0, "rgba(255,220,50,0.35)"); g1.addColorStop(0.4, "rgba(255,180,0,0.12)"); g1.addColorStop(1, "rgba(255,180,0,0)");
   ctx.fillStyle = g1; ctx.beginPath(); ctx.arc(sx, sy, r * 5.5, 0, Math.PI * 2); ctx.fill();
@@ -282,8 +311,9 @@ export default function WeatherCanvas({ condition, isDay, temp }: Props) {
             ctx.fillStyle = frost; ctx.fillRect(0, 0, w, h * 0.45);
           }
 
-          drawSun(ctx, w * 0.75, h * 0.16, t,
-            zone === "inferno" ? 74 : zone === "scorching" ? 65 : zone === "freezing" ? 42 : 55);
+          drawSun(ctx, w * 0.75, h * (zone === "cold" || zone === "freezing" ? 0.22 : 0.16), t,
+            zone === "inferno" ? 74 : zone === "scorching" ? 65 : (zone === "cold" || zone === "freezing") ? 38 : 55,
+            zone === "cold" || zone === "freezing");
 
           // Lazy wispy clouds on mild/cool
           if (zone === "mild" || zone === "cool") {
@@ -431,7 +461,7 @@ export default function WeatherCanvas({ condition, isDay, temp }: Props) {
       /* ── SNOW ────────────────────────────────────────────────────────── */
       else if (condition === "snow") {
         if (isDay) {
-          drawSun(ctx, w * 0.7, h * 0.14, t, 28);
+          drawSun(ctx, w * 0.7, h * 0.22, t, 26, true);
           ctx.fillStyle = "rgba(220,240,255,0.28)"; ctx.fillRect(0, 0, w, h);
         } else {
           drawStars(ctx, s.stars);
