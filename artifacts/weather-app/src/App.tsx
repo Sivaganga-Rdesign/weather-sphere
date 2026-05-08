@@ -53,7 +53,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen text-white relative">
-      <Background3D condition={condition} isDay={isDay} />
+      <Background3D condition={condition} isDay={isDay} temp={weather?.temp ?? 22} />
 
       {/* Dark gradient veil behind header so text stays readable on bright sky */}
       <div className="fixed inset-x-0 top-0 h-44 pointer-events-none z-[5]"
