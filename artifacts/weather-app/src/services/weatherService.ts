@@ -195,40 +195,79 @@ async function fetchAirQuality(lat: number, lon: number): Promise<AirQuality | n
 
 /* ─── Geocoding ────────────────────────────────────────────────────────── */
 
-/** Find matching locations for a query string (used for autocomplete). */
+/* ─── Nominatim (OpenStreetMap) fallback — covers villages OWM misses ── */
+
+function nominatimToGeoResult(r: any): GeoResult {
+  const addr = r.address ?? {};
+  return {
+    name: addr.village || addr.suburb || addr.town || addr.city || r.display_name.split(",")[0].trim(),
+    lat: parseFloat(r.lat),
+    lon: parseFloat(r.lon),
+    country: (addr.country_code ?? "").toUpperCase(),
+    state: addr.state,
+  };
+}
+
+async function nominatimSearch(query: string, limit = 5): Promise<GeoResult[]> {
+  try {
+    const res = await axios.get("https://nominatim.openstreetmap.org/search", {
+      params: { q: query, format: "json", limit, addressdetails: 1 },
+      headers: { "User-Agent": "WeatherApp/1.0" },
+      timeout: 6000,
+    });
+    return (res.data ?? []).map(nominatimToGeoResult);
+  } catch {
+    return [];
+  }
+}
+
+/** Find matching locations for a query string (used for autocomplete).
+ *  Tries OWM geocoding first; falls back to Nominatim for villages. */
 export async function geocodeSearch(query: string): Promise<GeoResult[]> {
   if (!query.trim()) return [];
   try {
     const res = await axios.get(`${GEO_URL}/direct`, {
       params: { q: query, limit: 5, appid: API_KEY },
     });
-    return res.data as GeoResult[];
-  } catch {
-    return [];
-  }
+    if ((res.data?.length ?? 0) > 0) return res.data as GeoResult[];
+  } catch { /* fall through */ }
+
+  // OWM returned nothing — try Nominatim (much better village/rural coverage)
+  return nominatimSearch(query, 5);
 }
 
 /**
  * Resolve a city name to coordinates.
- * Tries multiple strategies for small villages:
- *   1. Direct geocoding (supports partial names, state/country suffixes)
- *   2. Append ",IN" for India if no results on first try
+ * Strategy:
+ *   1. OWM geocoding with the raw query
+ *   2. OWM geocoding with ",IN" appended (helps for Indian place names)
+ *   3. Nominatim raw query
+ *   4. Nominatim with ",India" appended
  */
 async function geocodeCity(query: string): Promise<GeoResult | null> {
-  const attempts = [query];
-  // If query has no comma, also try with India suffix (common case for the user)
-  if (!query.includes(",")) attempts.push(`${query},IN`);
+  // ── OWM attempts ──────────────────────────────────────────────────────
+  const owmAttempts = [query];
+  if (!query.includes(",")) owmAttempts.push(`${query},IN`);
 
-  for (const attempt of attempts) {
+  for (const attempt of owmAttempts) {
     try {
       const res = await axios.get(`${GEO_URL}/direct`, {
         params: { q: attempt, limit: 1, appid: API_KEY },
       });
       if (res.data?.length > 0) return res.data[0];
-    } catch {
-      // continue
-    }
+    } catch { /* continue */ }
   }
+
+  // ── Nominatim fallback (villages, hamlets, rural areas) ───────────────
+  const nomAttempts = [query];
+  if (!query.toLowerCase().includes("india") && !query.includes(",")) {
+    nomAttempts.push(`${query}, India`);
+  }
+  for (const attempt of nomAttempts) {
+    const results = await nominatimSearch(attempt, 1);
+    if (results.length > 0) return results[0];
+  }
+
   return null;
 }
 

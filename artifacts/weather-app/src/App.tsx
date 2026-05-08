@@ -22,6 +22,12 @@ const CONDITION_ICON: Record<WeatherCondition, { day: string; night: string }> =
   default:      { day: "🌤",  night: "🌙" },
 };
 
+// Returns true if the user's device clock is between 6:00 and 19:00 local time
+function getLocalIsDay() {
+  const h = new Date().getHours();
+  return h >= 6 && h < 19;
+}
+
 export default function App() {
   const {
     weather, forecast, hourly, airQuality,
@@ -30,14 +36,21 @@ export default function App() {
   } = useWeather();
 
   const [condition, setCondition] = useState<WeatherCondition>("default");
-  const [isDay, setIsDay] = useState(true);
+  // isDay is based on the USER's local clock — not the searched city's timezone
+  const [isDay, setIsDay] = useState(getLocalIsDay);
 
+  // Update condition when weather changes (but keep isDay tied to local clock)
   useEffect(() => {
     if (weather) {
       setCondition(getWeatherCondition(weather.condition));
-      setIsDay(weather.isDay);
     }
   }, [weather]);
+
+  // Re-check local time every 60 seconds so it flips at 6am / 7pm automatically
+  useEffect(() => {
+    const id = setInterval(() => setIsDay(getLocalIsDay()), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   const headerIcon = CONDITION_ICON[condition]?.[isDay ? "day" : "night"] ?? "🌤";
 
