@@ -93,14 +93,14 @@ function fillSky(ctx: CanvasRenderingContext2D, w: number, h: number, stops: [nu
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
 }
 
-// Bright day skies
-const SKY_CLEAR_DAY    = [[0, "#0369a1"], [0.35, "#0ea5e9"], [0.7, "#38bdf8"], [1, "#7dd3fc"]] as [number,string][];
-const SKY_CLOUDS_DAY   = [[0, "#334155"], [0.4, "#475569"], [0.7, "#64748b"], [1, "#94a3b8"]] as [number,string][];
-const SKY_RAIN_DAY     = [[0, "#1e2d3d"], [0.4, "#2d3f52"], [0.8, "#3d5166"], [1, "#4a6070"]] as [number,string][];
-const SKY_SNOW_DAY     = [[0, "#bae6fd"], [0.4, "#e0f2fe"], [0.8, "#f0f9ff"], [1, "#f8fbff"]] as [number,string][];
+// Bright day skies — light, airy, true-to-life colours
+const SKY_CLEAR_DAY    = [[0, "#29b6f6"], [0.3, "#4fc3f7"], [0.65, "#81d4fa"], [1, "#b3e5fc"]] as [number,string][];
+const SKY_CLOUDS_DAY   = [[0, "#546e7a"], [0.4, "#78909c"], [0.75, "#90a4ae"], [1, "#b0bec5"]] as [number,string][];
+const SKY_RAIN_DAY     = [[0, "#37474f"], [0.4, "#455a64"], [0.75, "#546e7a"], [1, "#607d8b"]] as [number,string][];
+const SKY_SNOW_DAY     = [[0, "#b3e5fc"], [0.35, "#e1f5fe"], [0.7, "#f0f9ff"], [1, "#fafeff"]] as [number,string][];
 const SKY_STORM_DAY    = [[0, "#0f172a"], [0.4, "#1e293b"], [0.8, "#1e2d3d"], [1, "#0f172a"]] as [number,string][];
-const SKY_MIST_DAY     = [[0, "#64748b"], [0.4, "#94a3b8"], [0.8, "#cbd5e1"], [1, "#e2e8f0"]] as [number,string][];
-const SKY_DEFAULT_DAY  = [[0, "#0369a1"], [0.4, "#0284c7"], [0.75, "#0ea5e9"], [1, "#38bdf8"]] as [number,string][];
+const SKY_MIST_DAY     = [[0, "#78909c"], [0.4, "#90a4ae"], [0.8, "#cfd8dc"], [1, "#eceff1"]] as [number,string][];
+const SKY_DEFAULT_DAY  = [[0, "#29b6f6"], [0.35, "#4fc3f7"], [0.7, "#81d4fa"], [1, "#b3e5fc"]] as [number,string][];
 
 // Dark night skies
 const SKY_CLEAR_NIGHT  = [[0, "#020617"], [0.45, "#0f172a"], [0.8, "#0c1a3a"], [1, "#020617"]] as [number,string][];

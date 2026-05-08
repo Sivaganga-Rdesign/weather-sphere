@@ -94,7 +94,7 @@ export default function WeatherCard({ weather, condition }: Props) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.18 }}
-            className="text-white/45 text-sm mt-1"
+            className="text-white/70 text-sm mt-1"
           >
             {weather.country} · {new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}
           </motion.p>

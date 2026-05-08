@@ -20,8 +20,8 @@ export default function EmptyState({ onLocate }: Props) {
         <Cloud className="w-10 h-10 text-white/50" />
       </motion.div>
       <div>
-        <h2 className="text-white text-xl font-semibold mb-1">Check the weather</h2>
-        <p className="text-white/40 text-sm max-w-xs">
+        <h2 className="text-white text-xl font-semibold mb-1" style={{ textShadow: "0 1px 10px rgba(0,0,0,0.45)" }}>Check the weather</h2>
+        <p className="text-sm max-w-xs" style={{ color: "rgba(255,255,255,0.82)", textShadow: "0 1px 6px rgba(0,0,0,0.35)" }}>
           Search for any city above or use your current location to get started.
         </p>
       </div>

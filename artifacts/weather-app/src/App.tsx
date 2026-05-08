@@ -7,6 +7,7 @@ import HourlyChart from "./components/HourlyChart";
 import WeatherDetails from "./components/WeatherDetails";
 import WeatherAlerts from "./components/WeatherAlerts";
 import QuickSummaryBar from "./components/QuickSummaryBar";
+import HourlyStrip from "./components/HourlyStrip";
 import Loader from "./components/Loader";
 import EmptyState from "./components/EmptyState";
 import Background3D from "./components/Background3D";
@@ -53,6 +54,10 @@ export default function App() {
   return (
     <div className="min-h-screen text-white relative">
       <Background3D condition={condition} isDay={isDay} />
+
+      {/* Dark gradient veil behind header so text stays readable on bright sky */}
+      <div className="fixed inset-x-0 top-0 h-44 pointer-events-none z-[5]"
+        style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.32) 0%, rgba(0,0,0,0.10) 70%, transparent 100%)" }} />
 
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Header */}
@@ -124,6 +129,7 @@ export default function App() {
                   <WeatherCard weather={weather} condition={condition} />
                   <WeatherAlerts weather={weather} condition={condition} airQuality={airQuality} forecast={forecast} />
                   <WeatherDetails weather={weather} condition={condition} airQuality={airQuality} />
+                  {hourly.length > 0 && <HourlyStrip hourly={hourly} />}
                   {hourly.length > 0 && forecast.length > 0 && <HourlyChart hourly={hourly} forecast={forecast} />}
                   {forecast.length > 0 && <Forecast forecast={forecast} />}
                 </motion.div>
