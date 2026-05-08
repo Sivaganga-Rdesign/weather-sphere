@@ -23,7 +23,12 @@ const CONDITION_ICON: Record<WeatherCondition, { day: string; night: string }> =
 };
 
 export default function App() {
-  const { weather, forecast, hourly, airQuality, loading, error, searchCity, detectLocation } = useWeather();
+  const {
+    weather, forecast, hourly, airQuality,
+    loading, error,
+    searchCity, detectLocation, getSuggestions,
+  } = useWeather();
+
   const [condition, setCondition] = useState<WeatherCondition>("default");
   const [isDay, setIsDay] = useState(true);
 
@@ -68,21 +73,25 @@ export default function App() {
               </motion.div>
             </motion.div>
 
-            <SearchBar onSearch={searchCity} onLocate={detectLocation} loading={loading} />
+            <SearchBar
+              onSearch={searchCity}
+              onLocate={detectLocation}
+              loading={loading}
+              getSuggestions={getSuggestions}
+            />
           </div>
         </header>
 
         {/* Main content */}
         <main className="flex-1 px-4 md:px-8 pb-10">
           <div className="max-w-2xl mx-auto">
-            {/* Error */}
             <AnimatePresence>
               {error && (
                 <motion.div
                   initial={{ opacity: 0, y: -10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  className="mb-4 mt-2 px-4 py-3 rounded-2xl bg-red-500/15 border border-red-400/20 text-red-200 text-sm"
+                  className="mb-4 mt-2 px-4 py-3 rounded-2xl bg-red-500/15 border border-red-400/20 text-red-200 text-sm leading-relaxed"
                 >
                   {error}
                 </motion.div>

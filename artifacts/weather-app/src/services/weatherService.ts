@@ -2,6 +2,7 @@ import axios from "axios";
 
 const API_KEY = import.meta.env.VITE_WEATHER_API_KEY;
 const BASE_URL = "https://api.openweathermap.org/data/2.5";
+const GEO_URL = "https://api.openweathermap.org/geo/1.0";
 
 export interface WeatherData {
   city: string;
@@ -29,6 +30,15 @@ export interface WeatherData {
   isDay: boolean;
 }
 
+export interface GeoResult {
+  name: string;
+  localNames?: Record<string, string>;
+  lat: number;
+  lon: number;
+  country: string;
+  state?: string;
+}
+
 export interface ForecastDay {
   date: number;
   tempMin: number;
@@ -53,7 +63,7 @@ export interface HourlyPoint {
 }
 
 export interface AirQuality {
-  aqi: number;      // 1–5
+  aqi: number;
   label: string;
   co: number;
   no2: number;
@@ -77,12 +87,11 @@ export function getWeatherCondition(main: string): WeatherCondition {
   return "default";
 }
 
-function precise(n: number) {
-  return Math.round(n * 10) / 10;
-}
+function precise(n: number) { return Math.round(n * 10) / 10; }
 
-function handleApiError(e: any) {
+function handleApiError(e: any, city?: string) {
   if (e?.response?.status === 401) throw new Error("__INVALID_API_KEY__");
+  if (e?.response?.status === 404) throw new Error(city ? `__NOT_FOUND__:${city}` : "__NOT_FOUND__");
   throw e;
 }
 
@@ -90,11 +99,10 @@ function mapWeather(data: any): WeatherData {
   const dt = data.dt;
   const sunrise = data.sys.sunrise;
   const sunset = data.sys.sunset;
-  // Add timezone offset to get local time at that location
-  const localNow = dt + data.timezone;
-  const localSunrise = sunrise + data.timezone;
-  const localSunset = sunset + data.timezone;
-  const isDay = localNow >= localSunrise && localNow <= localSunset;
+  const tz = data.timezone;
+  const localNow = dt + tz;
+  const localSunrise = sunrise + tz;
+  const localSunset = sunset + tz;
 
   return {
     city: data.name,
@@ -106,7 +114,7 @@ function mapWeather(data: any): WeatherData {
     tempMin: precise(data.main.temp_min),
     tempMax: precise(data.main.temp_max),
     humidity: data.main.humidity,
-    windSpeed: precise(data.wind.speed * 3.6),
+    windSpeed: precise((data.wind.speed ?? 0) * 3.6),
     windDeg: data.wind.deg ?? 0,
     windGust: precise((data.wind.gust ?? 0) * 3.6),
     pressure: data.main.pressure,
@@ -118,8 +126,8 @@ function mapWeather(data: any): WeatherData {
     sunset,
     clouds: data.clouds?.all ?? 0,
     dt,
-    timezone: data.timezone,
-    isDay,
+    timezone: tz,
+    isDay: localNow >= localSunrise && localNow <= localSunset,
   };
 }
 
@@ -185,34 +193,109 @@ async function fetchAirQuality(lat: number, lon: number): Promise<AirQuality | n
   }
 }
 
+/* ─── Geocoding ────────────────────────────────────────────────────────── */
+
+/** Find matching locations for a query string (used for autocomplete). */
+export async function geocodeSearch(query: string): Promise<GeoResult[]> {
+  if (!query.trim()) return [];
+  try {
+    const res = await axios.get(`${GEO_URL}/direct`, {
+      params: { q: query, limit: 5, appid: API_KEY },
+    });
+    return res.data as GeoResult[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Resolve a city name to coordinates.
+ * Tries multiple strategies for small villages:
+ *   1. Direct geocoding (supports partial names, state/country suffixes)
+ *   2. Append ",IN" for India if no results on first try
+ */
+async function geocodeCity(query: string): Promise<GeoResult | null> {
+  const attempts = [query];
+  // If query has no comma, also try with India suffix (common case for the user)
+  if (!query.includes(",")) attempts.push(`${query},IN`);
+
+  for (const attempt of attempts) {
+    try {
+      const res = await axios.get(`${GEO_URL}/direct`, {
+        params: { q: attempt, limit: 1, appid: API_KEY },
+      });
+      if (res.data?.length > 0) return res.data[0];
+    } catch {
+      // continue
+    }
+  }
+  return null;
+}
+
+/* ─── IP-based geolocation fallback ───────────────────────────────────── */
+
+export interface IpLocation {
+  lat: number;
+  lon: number;
+  city: string;
+}
+
+export async function getLocationByIp(): Promise<IpLocation | null> {
+  try {
+    const res = await axios.get("https://ipapi.co/json/", { timeout: 5000 });
+    const { latitude, longitude, city } = res.data;
+    if (latitude && longitude) {
+      return { lat: latitude, lon: longitude, city: city ?? "Your Location" };
+    }
+    return null;
+  } catch {
+    try {
+      // Second fallback: ip-api.com
+      const res2 = await axios.get("http://ip-api.com/json/", { timeout: 5000 });
+      const { lat, lon, city } = res2.data;
+      if (lat && lon) return { lat, lon, city: city ?? "Your Location" };
+      return null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+/* ─── Public fetch functions ───────────────────────────────────────────── */
+
 export async function fetchWeatherByCity(city: string): Promise<{ weather: WeatherData; airQuality: AirQuality | null }> {
+  // First geocode to lat/lon — handles small villages, partial names, etc.
+  const geo = await geocodeCity(city);
+  if (!geo) {
+    // Provide a helpful error with suggestions if we have any
+    throw new Error(`__NOT_FOUND__:${city}`);
+  }
+
+  // Fetch weather by coordinates (always succeeds if coords are valid)
   const res = await axios
-    .get(`${BASE_URL}/weather`, { params: { q: city, appid: API_KEY, units: "metric" } })
-    .catch(handleApiError);
+    .get(`${BASE_URL}/weather`, { params: { lat: geo.lat, lon: geo.lon, appid: API_KEY, units: "metric" } })
+    .catch((e) => handleApiError(e, city));
   const weather = mapWeather(res.data);
-  const airQuality = await fetchAirQuality(weather.lat, weather.lon);
+  // Override city name with the geocoded name (more accurate for villages)
+  weather.city = geo.name;
+  weather.country = geo.country;
+
+  const airQuality = await fetchAirQuality(geo.lat, geo.lon);
   return { weather, airQuality };
 }
 
 export async function fetchWeatherByCoords(lat: number, lon: number): Promise<{ weather: WeatherData; airQuality: AirQuality | null }> {
   const res = await axios
     .get(`${BASE_URL}/weather`, { params: { lat, lon, appid: API_KEY, units: "metric" } })
-    .catch(handleApiError);
+    .catch((e) => handleApiError(e));
   const weather = mapWeather(res.data);
   const airQuality = await fetchAirQuality(lat, lon);
   return { weather, airQuality };
 }
 
-export async function fetchForecast(city: string): Promise<{ daily: ForecastDay[]; hourly: HourlyPoint[] }> {
-  const res = await axios
-    .get(`${BASE_URL}/forecast`, { params: { q: city, appid: API_KEY, units: "metric", cnt: 40 } })
-    .catch(handleApiError);
-  return mapForecastData(res.data);
-}
-
-export async function fetchForecastByCoords(lat: number, lon: number): Promise<{ daily: ForecastDay[]; hourly: HourlyPoint[] }> {
+export async function fetchForecast(lat: number, lon: number): Promise<{ daily: ForecastDay[]; hourly: HourlyPoint[] }> {
   const res = await axios
     .get(`${BASE_URL}/forecast`, { params: { lat, lon, appid: API_KEY, units: "metric", cnt: 40 } })
-    .catch(handleApiError);
+    .catch((e) => handleApiError(e));
   return mapForecastData(res.data);
 }

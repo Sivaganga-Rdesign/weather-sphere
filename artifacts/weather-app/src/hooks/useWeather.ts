@@ -3,7 +3,9 @@ import {
   fetchWeatherByCity,
   fetchWeatherByCoords,
   fetchForecast,
-  fetchForecastByCoords,
+  getLocationByIp,
+  geocodeSearch,
+  GeoResult,
   WeatherData,
   ForecastDay,
   HourlyPoint,
@@ -33,14 +35,20 @@ export interface WeatherState {
   error: string | null;
   searchCity: (city: string) => Promise<void>;
   detectLocation: () => void;
+  getSuggestions: (query: string) => Promise<GeoResult[]>;
 }
 
 function errorMsg(e: any, city?: string): string {
-  if (e?.message === "__INVALID_API_KEY__" || e?.response?.status === 401)
+  const msg: string = e?.message ?? "";
+  if (msg === "__INVALID_API_KEY__" || e?.response?.status === 401)
     return "API key invalid or not yet active. New OpenWeather keys can take up to 2 hours to activate.";
-  if (e?.response?.status === 404)
-    return city ? `City "${city}" not found. Please check the spelling.` : "Location not found.";
-  return "Failed to fetch weather. Please try again.";
+  if (msg.startsWith("__NOT_FOUND__")) {
+    const name = msg.split(":")[1];
+    return name
+      ? `"${name}" wasn't found. Try adding a district or state — e.g. "Koproli, Maharashtra" or "Koproli, Raigad".`
+      : "Location not found. Try adding a state or country name after a comma.";
+  }
+  return "Failed to fetch weather. Please check your connection and try again.";
 }
 
 export function useWeather(): WeatherState {
@@ -56,10 +64,8 @@ export function useWeather(): WeatherState {
     setLoading(true);
     setError(null);
     try {
-      const [{ weather: w, airQuality: aq }, fc] = await Promise.all([
-        fetchWeatherByCity(city),
-        fetchForecast(city),
-      ]);
+      const { weather: w, airQuality: aq } = await fetchWeatherByCity(city);
+      const fc = await fetchForecast(w.lat, w.lon);
       setWeather(w);
       setAirQuality(aq);
       setForecast(fc.daily);
@@ -73,37 +79,71 @@ export function useWeather(): WeatherState {
   }, []);
 
   const detectLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      setError("Geolocation is not supported by your browser.");
-      return;
-    }
     setLoading(true);
     setError(null);
+
+    const fetchByCoords = async (lat: number, lon: number) => {
+      const [{ weather: w, airQuality: aq }, fc] = await Promise.all([
+        fetchWeatherByCoords(lat, lon),
+        fetchForecast(lat, lon),
+      ]);
+      setWeather(w);
+      setAirQuality(aq);
+      setForecast(fc.daily);
+      setHourly(fc.hourly);
+      recent.add(w.city);
+    };
+
+    const tryIpFallback = async () => {
+      const ipLoc = await getLocationByIp();
+      if (ipLoc) {
+        await fetchByCoords(ipLoc.lat, ipLoc.lon);
+      } else {
+        setError("Couldn't detect your location. Please search for your city manually.");
+      }
+    };
+
+    if (!navigator.geolocation) {
+      // No geolocation support at all — go straight to IP
+      tryIpFallback().catch(() => {
+        setError("Location detection failed. Please search by city name.");
+      }).finally(() => setLoading(false));
+      return;
+    }
+
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
-          const { latitude: lat, longitude: lon } = pos.coords;
-          const [{ weather: w, airQuality: aq }, fc] = await Promise.all([
-            fetchWeatherByCoords(lat, lon),
-            fetchForecastByCoords(lat, lon),
-          ]);
-          setWeather(w);
-          setAirQuality(aq);
-          setForecast(fc.daily);
-          setHourly(fc.hourly);
-          recent.add(w.city);
+          await fetchByCoords(pos.coords.latitude, pos.coords.longitude);
         } catch (e: any) {
           setError(errorMsg(e));
         } finally {
           setLoading(false);
         }
       },
-      () => {
-        setError("Location access denied. Please search by city name.");
-        setLoading(false);
-      }
+      async (err) => {
+        // Permission denied or unavailable — fall back to IP silently
+        try {
+          if (err.code === 1 || err.code === 2) {
+            // PERMISSION_DENIED or POSITION_UNAVAILABLE → try IP
+            await tryIpFallback();
+          } else {
+            setError("Location timed out. Please search by city name.");
+          }
+        } catch {
+          setError("Location detection failed. Please search by city name.");
+        } finally {
+          setLoading(false);
+        }
+      },
+      { timeout: 6000, maximumAge: 60000 }
     );
   }, []);
 
-  return { weather, forecast, hourly, airQuality, loading, error, searchCity, detectLocation };
+  const getSuggestions = useCallback(async (query: string): Promise<GeoResult[]> => {
+    if (query.trim().length < 2) return [];
+    return geocodeSearch(query);
+  }, []);
+
+  return { weather, forecast, hourly, airQuality, loading, error, searchCity, detectLocation, getSuggestions };
 }
