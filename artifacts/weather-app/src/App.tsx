@@ -6,6 +6,7 @@ import Forecast from "./components/Forecast";
 import HourlyChart from "./components/HourlyChart";
 import WeatherDetails from "./components/WeatherDetails";
 import WeatherAlerts from "./components/WeatherAlerts";
+import QuickSummaryBar from "./components/QuickSummaryBar";
 import Loader from "./components/Loader";
 import EmptyState from "./components/EmptyState";
 import Background3D from "./components/Background3D";
@@ -22,7 +23,6 @@ const CONDITION_ICON: Record<WeatherCondition, { day: string; night: string }> =
   default:      { day: "🌤",  night: "🌙" },
 };
 
-// Returns true if the user's device clock is between 6:00 and 19:00 local time
 function getLocalIsDay() {
   const h = new Date().getHours();
   return h >= 6 && h < 19;
@@ -36,17 +36,13 @@ export default function App() {
   } = useWeather();
 
   const [condition, setCondition] = useState<WeatherCondition>("default");
-  // isDay is based on the USER's local clock — not the searched city's timezone
   const [isDay, setIsDay] = useState(getLocalIsDay);
 
-  // Update condition when weather changes (but keep isDay tied to local clock)
   useEffect(() => {
-    if (weather) {
-      setCondition(getWeatherCondition(weather.condition));
-    }
+    if (weather) setCondition(getWeatherCondition(weather.condition));
   }, [weather]);
 
-  // Re-check local time every 60 seconds so it flips at 6am / 7pm automatically
+  // Flip day/night automatically every minute based on user's local clock
   useEffect(() => {
     const id = setInterval(() => setIsDay(getLocalIsDay()), 60_000);
     return () => clearInterval(id);
@@ -60,19 +56,17 @@ export default function App() {
 
       <div className="relative z-10 min-h-screen flex flex-col">
         {/* Header */}
-        <header className="pt-8 pb-4 px-4 md:px-8">
+        <header className="pt-8 pb-3 px-4 md:px-8">
           <div className="max-w-2xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center justify-between mb-6"
+              className="flex items-center justify-between mb-5"
             >
               <div>
                 <h1 className="text-lg font-bold text-white tracking-tight">Weather</h1>
                 <p className="text-white/30 text-xs">
-                  {new Date().toLocaleDateString([], {
-                    weekday: "long", month: "long", day: "numeric", year: "numeric",
-                  })}
+                  {new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
                 </p>
               </div>
               <motion.div
@@ -112,10 +106,7 @@ export default function App() {
             </AnimatePresence>
 
             {loading && <Loader />}
-
-            {!loading && !weather && !error && (
-              <EmptyState onLocate={detectLocation} />
-            )}
+            {!loading && !weather && !error && <EmptyState onLocate={detectLocation} />}
 
             <AnimatePresence mode="wait">
               {!loading && weather && (
@@ -125,14 +116,15 @@ export default function App() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.4 }}
-                  className="flex flex-col gap-4 mt-2"
+                  className="flex flex-col gap-3 mt-2"
                 >
+                  {/* Sticky summary bar */}
+                  <QuickSummaryBar weather={weather} forecast={forecast} />
+
                   <WeatherCard weather={weather} condition={condition} />
                   <WeatherAlerts weather={weather} condition={condition} airQuality={airQuality} forecast={forecast} />
                   <WeatherDetails weather={weather} condition={condition} airQuality={airQuality} />
-                  {hourly.length > 0 && forecast.length > 0 && (
-                    <HourlyChart hourly={hourly} forecast={forecast} />
-                  )}
+                  {hourly.length > 0 && forecast.length > 0 && <HourlyChart hourly={hourly} forecast={forecast} />}
                   {forecast.length > 0 && <Forecast forecast={forecast} />}
                 </motion.div>
               )}
